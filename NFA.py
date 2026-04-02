@@ -6,20 +6,62 @@ Created on Wed Mar 18 18:05:29 2026
 """
 import json
 
-# for now we will use a code 
-# stub (draft) for a finite automata
-
-class NFA:
+class DFA:
     def __init__(self, Q, q0, Sigma, F, delta):
         self.Q = Q                  # list of states
         self.q0 = q0                # start state
         self.Sigma = Sigma          # alphabet
         self.F = F                  # accepting states
         self.delta = delta          # transition table
-
+        
     def __repr__(self):
-        return (f"NFA(Q={self.Q}, q0={self.q0}, "
-                f"Sigma={self.Sigma}, F={self.F})")
+        def fmt_state(s):
+            return "{" + ", ".join(sorted(s)) + "}"
+    
+        lines = []
+        lines.append("DFA(")
+        lines.append(f"  Q={{ {', '.join(fmt_state(s) for s in self.Q)} }},")
+        lines.append(f"  q0={fmt_state(self.q0)},")
+        lines.append(f"  Sigma={self.Sigma},")
+        lines.append(f"  F={{ {', '.join(fmt_state(s) for s in self.F)} }},")
+        lines.append("  delta={")
+    
+        for (state, a), target in self.delta.items():
+            lines.append(f"    ({fmt_state(state)}, '{a}') -> {fmt_state(target)}")
+    
+        lines.append("  }")
+        lines.append(")")
+        return "\n".join(lines)
+
+# for now we will use a code 
+# stub (draft) for a finite automata
+
+class NFA(DFA):
+    
+    def find_all_paths(self, qq, a):
+        result = set()
+        for q in qq:
+            result |= self.delta.get((q, a), set())
+        return result
+    
+    def epsilon_closure_of_set(self, qq):
+        EE = set()
+        for q in qq:
+            E = self.epsilon_closure(q)
+            EE |= E      # union
+        return EE
+    
+    def epsilon_closure(self, q):
+        stack = [q]
+        closure = {q}
+        while stack:
+            state = stack.pop()
+            for nxt in self.delta.get((state, "eps"), set()):
+                if nxt not in closure:
+                    closure.add(nxt)
+                    stack.append(nxt)
+        return closure
+
     
     def save_to_file(self, filename):
         symbols = self.Sigma + ["eps"]
@@ -41,5 +83,32 @@ class NFA:
         with open(filename, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=4)
 
-
+    def save_to_dot(self, filename):
+        with open(filename, "w", encoding="utf-8") as f:
+            f.write("digraph NFA {\n")
+            f.write("    rankdir=LR;\n")
+    
+            # accepting states
+            f.write("    node [shape = doublecircle]; ")
+            for q in self.F:
+                f.write(f"{q} ")
+            f.write(";\n")
+    
+            # normal states
+            f.write("    node [shape = circle];\n")
+    
+            # start arrow
+            f.write(f"    start [shape=point];\n")
+            f.write(f"    start -> {self.q0};\n")
+    
+            # transitions
+            symbols = self.Sigma + ["eps"]
+            for q in self.Q:
+                for s in symbols:
+                    targets = self.delta.get((q, s), set())
+                    for t in targets:
+                        label = "ε" if s == "eps" else s
+                        f.write(f'    {q} -> {t} [label="{label}"];\n')
+    
+            f.write("}\n")
 
